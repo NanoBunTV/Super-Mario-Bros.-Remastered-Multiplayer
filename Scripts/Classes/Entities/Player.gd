@@ -757,6 +757,17 @@ func apply_classic_physics() -> void:
 func recenter_camera() -> void:
 	%CameraHandler.recenter_camera()
 	%CameraHandler.update_camera_barriers()
+	#region MULTIPLAYER
+	# A recentre is a deliberate jump - checkpoint, pipe exit, level start - so the shared
+	# camera's smoothing history is dropped rather than eased across it.
+	Coop.reset_shared_target()
+	# In same-screen co-op the camera actually on screen belongs to player 1, so recentring any
+	# other player has to recentre that one too. Player 1 is excluded, so this cannot recurse.
+	if Coop.is_shared_camera() and player_id != 0:
+		var view_owner := Coop.player_for_slot(0)
+		if view_owner != null and view_owner != self:
+			view_owner.recenter_camera()
+	#endregion MULTIPLAYER
 
 func reparent_camera() -> void:
 	return
@@ -860,6 +871,12 @@ func apply_gravity(delta: float) -> void:
 		velocity.y = clamp(velocity.y, -(target_fall / (1.2 if low_gravity else 1.0)), INF)
 
 func camera_make_current() -> void:
+	#region MULTIPLAYER
+	# Player 1's camera is the shared view in same-screen co-op; letting anyone else grab it
+	# here (pipe exits, editor level start) would snap the view onto whoever moved last.
+	if Coop.is_shared_camera() and player_id != 0:
+		return
+	#endregion MULTIPLAYER
 	camera.enabled = true
 	camera.make_current()
 	
@@ -969,7 +986,10 @@ func add_stomp_combo(award_score := true) -> void:
 				score_note_spawner.spawn_note(10000)
 			else:
 				AudioManager.play_global_sfx("1_up")
-				Global.lives += 1
+				#region MULTIPLAYER
+				# Lives are per-player in co-op, so the 1-up goes to whoever earned the combo.
+				Coop.add_lives(player_id, 1)
+				#endregion MULTIPLAYER
 				score_note_spawner.spawn_one_up_note()
 	else:
 		if award_score:
@@ -1275,6 +1295,13 @@ func die(pit: bool = false, type: String = "") -> void:
 	if ["Dead", "Pipe", "LevelExit"].has(state_machine.state.name):
 		return
 	if type != "": last_damage_source = type if type in valid_death_types else ""
+	#region MULTIPLAYER
+	# In co-op a death only ends the level once everybody is down. While a teammate is still
+	# alive, respawn on them instead of pausing the tree and reloading. See MULTIPLAYER.md.
+	if Coop.should_local_death(self):
+		Coop.begin_local_death(self, pit)
+		return
+	#endregion MULTIPLAYER
 	is_dead = true
 	visible = not pit
 	dead.emit()
@@ -1429,8 +1456,13 @@ func power_up_animation(new_power_state := "") -> void:
 
 	sprite.process_mode = Node.PROCESS_MODE_ALWAYS
 	sprite.show()
-	get_tree().paused = true
-	
+	#region MULTIPLAYER
+	# Upstream freezes the whole level for the grow/shrink animation. In co-op that means every
+	# mushroom any player touches stalls everyone else, so the freeze is skipped.
+	if not Coop.is_active():
+		get_tree().paused = true
+	#endregion MULTIPLAYER
+
 	var hitbox_changed = new_state.power_tier != old_state.power_tier
 	var shrinking = hitbox_changed and (new_state.power_tier < old_state.power_tier)
 	var can_powerup_jump = Global.player_action_pressed("jump", player_id) == false
@@ -1492,7 +1524,10 @@ func power_up_animation(new_power_state := "") -> void:
 			if rainbow:
 				sprite.material.set_shader_parameter("enabled", false)
 	sprite.play("Idle")
-	get_tree().paused = false
+	#region MULTIPLAYER
+	if not Coop.is_active():
+		get_tree().paused = false
+	#endregion MULTIPLAYER
 	sprite.process_mode = Node.PROCESS_MODE_INHERIT
 
 	if Global.player_action_pressed("jump", player_id) and can_powerup_jump:
@@ -1515,6 +1550,16 @@ func get_character_sprite_path(power_stateto_use := power_state.state_name) -> S
 	return path
 
 func enter_pipe(pipe: PipeArea, warp_to_level := true, wait_forever := false) -> void:
+	#region MULTIPLAYER
+	# In co-op the others are deliberately left playing so they can reach the pipe too, exactly
+	# like the flagpole. The first player down it starts a countdown; whoever has not made it by
+	# then is taken along anyway. Only the first entry drives the warp.
+	if Coop.is_active() and warp_to_level and not wait_forever:
+		if Coop.pipe_already_taken():
+			Coop.follow_into_pipe(self, pipe)
+			return
+		Coop.mark_pipe_taken()
+	#endregion MULTIPLAYER
 	z_index = -10
 	can_bump_sfx = false
 	Global.can_pause = false
@@ -1528,7 +1573,14 @@ func enter_pipe(pipe: PipeArea, warp_to_level := true, wait_forever := false) ->
 	hide_pipe_animation()
 	if !wait_forever:
 		if warp_to_level:
-			await get_tree().create_timer(1, false).timeout
+			#region MULTIPLAYER
+			# Co-op holds the level open so the others can reach the pipe too, then takes anyone
+			# left along, instead of warping a flat second after the first player goes down.
+			if Coop.is_active():
+				await Coop.await_pipe_window(pipe)
+			else:
+				await get_tree().create_timer(1, false).timeout
+			#endregion MULTIPLAYER
 			if Global.current_game_mode == Global.GameMode.LEVEL_EDITOR:
 				LevelEditor.play_pipe_transition = true
 				Global.level_editor.transition_to_sublevel(pipe.target_sub_level)

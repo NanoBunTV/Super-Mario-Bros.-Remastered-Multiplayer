@@ -80,14 +80,34 @@ func handle_camera(delta: float) -> void:
 			handle_offsets(delta)
 		else:
 			handle_sp_scrolling()
-	
+
+	#region MULTIPLAYER
+	# Upstream already converges every player's handler on a single lead player above, which is
+	# most of a same-screen camera. This shifts the framing target from that lead player to the
+	# midpoint of the group, so a trailing player stays on screen instead of only the leader.
+	# Applied after upstream's scrolling and before do_limits, so the level bounds still clamp.
+	if Coop.is_shared_camera():
+		var coop_target := Coop.shared_camera_target_x()
+		if not is_nan(coop_target):
+			if coop_target > camera_position.x or Global.current_level.can_backscroll:
+				camera_position.x = coop_target
+	#endregion MULTIPLAYER
+
 	do_limits()
 	camera.global_position = camera_position + camera_offset
 	update_camera_barriers()
 
 func update_camera_barriers() -> void:
 	if get_viewport() != null and get_viewport().get_camera_2d() != null:
-		camera_center_joint.global_position = get_viewport().get_camera_2d().get_screen_center_position()
+		#region MULTIPLAYER
+		# Split-screen gives each player their own view, so their barriers belong at their own
+		# camera's centre rather than the one camera that happens to be current in the root
+		# viewport.
+		var source_camera: Camera2D = get_viewport().get_camera_2d()
+		if Coop.is_active() and Coop.is_split_screen():
+			source_camera = camera
+		camera_center_joint.global_position = source_camera.get_screen_center_position()
+		#endregion MULTIPLAYER
 		camera_center_joint.get_node("LeftWall").position.x = -(get_viewport_rect().size.x / 2)
 		camera_center_joint.get_node("RightWall").position.x = (get_viewport_rect().size.x / 2)
 		for i in [camera_center_joint.get_node("RightWall"), camera_center_joint.get_node("LeftWall")]:

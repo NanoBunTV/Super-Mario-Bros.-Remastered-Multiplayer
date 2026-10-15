@@ -13,6 +13,11 @@ var selected_index := 0
 signal option_1_selected
 signal option_2_selected
 signal option_3_selected
+#region MULTIPLAYER
+## `option_selected` emits by index, so a fourth menu entry needs a fourth signal to land on.
+## CoopTitleHook appends the co-op entry last and connects here. See MULTIPLAYER.md.
+signal option_4_selected
+#endregion MULTIPLAYER
 
 signal closed
 

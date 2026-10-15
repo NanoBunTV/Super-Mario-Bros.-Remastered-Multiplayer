@@ -104,6 +104,18 @@ func get_custom_characters() -> void:
 				Global.log_warning("Character: \"%s\" is missing: %s!" % [i, final_list_str])
 
 func open() -> void:
+	#region MULTIPLAYER
+	# Every player already chose in the co-op lobby, so this screen has nothing left to ask.
+	# Deferred so the caller's signal finishes emitting before the flow moves on. Covers every
+	# entry point (story, World 9, ANN) without touching TitleScreen.tscn's wiring.
+	if Coop.is_active():
+		# Custom characters still need registering; the rest of open() is what we skip.
+		get_custom_characters()
+		active = false
+		hide()
+		selected.emit.call_deferred()
+		return
+	#endregion MULTIPLAYER
 	get_custom_characters()
 	show()
 	selected_index = int(Global.player_characters[player_id])

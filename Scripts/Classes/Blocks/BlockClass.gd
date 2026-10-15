@@ -49,17 +49,23 @@ func dispense_item() -> void:
 	node.set_meta("no_persist", true)
 	node.set_meta("layer", get_meta("layer", -1))
 	if node is PowerUpItem or node.has_meta("is_item"):
-		for i in get_tree().get_nodes_in_group("Players"):
-			add_sibling(node)
-			node.global_position = global_position - Vector2(0, 1)
-			node.hide()
-			node.reset_physics_interpolation()
-			if node is PowerUpItem:
-				if Global.connected_players > 1:
-					AudioManager.play_sfx("item_appear", global_position)
-					node.player_multiplayer_launch_spawn(i)
-				else:
-					node.block_dispense_tween()
+		#region MULTIPLAYER
+		# Upstream looped over every player here, but only one item was ever instantiated - so
+		# add_sibling() was called repeatedly on the same node, and with 2+ players the co-op
+		# branch ran player_multiplayer_launch_spawn(), which sets a velocity but never calls
+		# show(). The item was hidden just above and nothing ever revealed it, so every block
+		# in co-op dispensed a permanently invisible power-up.
+		#
+		# One item is dispensed and any player can take it. This is upstream's single-player
+		# path verbatim, minus the loop - with one player the loop ran exactly once, so
+		# single-player behaviour is unchanged.
+		add_sibling(node)
+		node.global_position = global_position - Vector2(0, 1)
+		node.hide()
+		node.reset_physics_interpolation()
+		if node is PowerUpItem:
+			node.block_dispense_tween()
+		#endregion MULTIPLAYER
 	else:
 		if item.resource_path == "res://Scenes/Prefabs/Entities/Items/SpinningRedCoin.tscn":
 			if has_meta("r_coin_id"):

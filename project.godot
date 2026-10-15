@@ -15,9 +15,10 @@ warnings/check_angle_interpolation_type_conflicting=false
 
 [application]
 
-config/name="SMB1R"
+config/name="SMB1R Multiplayer"
 run/main_scene="uid://bn66tnn8nlpi7"
 config/use_custom_user_dir=true
+config/custom_user_dir_name="SMB1R"
 config/features=PackedStringArray("4.6", "Forward Plus")
 boot_splash/bg_color=Color(0, 0, 0, 1)
 boot_splash/show_image=false
@@ -43,6 +44,7 @@ AudioManager="*res://Scenes/Prefabs/Autoload/AudioManager.tscn"
 BetterTerrain="*res://addons/better-terrain/BetterTerrain.gd"
 GameBanana="*res://Scripts/Classes/Singletons/GameBananaManager.gd"
 SpeedrunHandler="*res://Scripts/Classes/Singletons/SpeedrunHandler.gd"
+Coop="*res://Scripts/Multiplayer/CoopManager.gd"
 
 [debug]
 
@@ -68,6 +70,7 @@ naming/default_signal_callback_name="on_{signal_name}"
 naming/default_signal_callback_to_self_name="on_{signal_name}"
 naming/scene_name_casing=1
 naming/script_name_casing=1
+export/convert_text_resources_to_binary=false
 
 [editor_plugins]
 
@@ -524,6 +527,14 @@ quick_connect={
 ]
 }
 move_down_1={
+"deadzone": 0.2,
+"events": []
+}
+move_down_2={
+"deadzone": 0.2,
+"events": []
+}
+move_down_3={
 "deadzone": 0.2,
 "events": []
 }

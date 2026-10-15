@@ -24,6 +24,9 @@ func give_life(_player: Player) -> void:
 		Global.score += 2000
 		$ScoreNoteSpawner.spawn_note(2000)
 	else:
-		Global.lives += 1
+		#region MULTIPLAYER
+		# Lives are per-player in co-op, so the 1-up goes to whoever picked the mushroom up.
+		Coop.add_lives(_player.player_id if _player != null else 0, 1)
+		#endregion MULTIPLAYER
 		$ScoreNoteSpawner.spawn_one_up_note()
 	queue_free()

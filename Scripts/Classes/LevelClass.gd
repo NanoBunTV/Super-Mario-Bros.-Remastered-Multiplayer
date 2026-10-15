@@ -143,8 +143,10 @@ func reset_resolution() -> void:
 
 
 func spawn_in_extra_players() -> void:
-	# Fuck you lmao, no multiplayer
-	return
+	#region MULTIPLAYER
+	# Upstream ships this as a bare `return`. See MULTIPLAYER.md.
+	CoopSpawner.spawn(self)
+	#endregion MULTIPLAYER
 
 func update_theme() -> void:
 	Global.update_theme()

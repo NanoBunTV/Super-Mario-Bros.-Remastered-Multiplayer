@@ -2,7 +2,16 @@ extends PlayerState
 
 var can_fall := false
 
+#region MULTIPLAYER
+## Set when CoopManager drove this death, meaning the player will respawn on a teammate
+## rather than the level reloading. See MULTIPLAYER.md.
+var local_death := false
+#endregion MULTIPLAYER
+
 func enter(msg := {}) -> void:
+	#region MULTIPLAYER
+	local_death = msg.get("Local", false)
+	#endregion MULTIPLAYER
 	if not death_params("DEATH_COLLISION"):
 		player.z_index = 20
 		for i in 16:
@@ -26,6 +35,14 @@ func physics_update(delta: float) -> void:
 		player.velocity.y += (death_params("DEATH_FALL_GRAVITY") / delta) * delta * player.gravity_vector.y
 		player.velocity.y = clamp(player.velocity.y, -death_params("DEATH_MAX_FALL_SPEED"), death_params("DEATH_MAX_FALL_SPEED")) # wish this could be better than just substituting -INF but you can't win em all ~ nabbup
 		player.move()
+		#region MULTIPLAYER
+		# A co-op local death respawns on a teammate; skipping ahead here would reload the
+		# level out from under everyone still playing.
+		if local_death:
+			if player.is_actually_on_floor():
+				deceleration(delta)
+			return
+		#endregion MULTIPLAYER
 		if Global.multibind_action_just_pressed("ui_accept") or Global.multibind_action_just_pressed("jump_0"):
 			player.death_load()
 		if player.is_actually_on_floor():
